@@ -26,11 +26,11 @@ mlstack <command> [switches] <stack> [arguments]
 
 The following commands are currently in use:
 
-init
-stack
-list-levels
-prune
-delete-level
-recover-file
+- init
+- stack
+- list-levels
+- prune
+- delete-level
+- recover-file
 
 Pass --help for a full list of commands and switches.
