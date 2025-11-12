@@ -29,8 +29,8 @@ internal static partial class Program
         {
             //args = "list-levels ~/test.stack".Split(' ');
             //args = "init ~/test.stack".Split(' ');
-            //args = "stack ~/test.stack ~/stacktest".Split(' ');
-            args = "--help".Split(' ');
+            args = "stack -n ~/test.stack ~/stacktest".Split(' ');
+            //args = "--help".Split(' ');
             //args = "recover-file -o ~/sb.png ~/test.stack sb".Split(' ');
         }
         

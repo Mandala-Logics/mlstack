@@ -11,6 +11,8 @@ namespace mlEncodedDB
 {
     public sealed partial class BlockList : IDisposable, IEnumerable<IEncodable>
     {
+        internal static int BlockTableLength = 64;
+
         public IEncodable this[int index] => Get(index);
         public int Count => counter.GetCount();
 
@@ -31,7 +33,7 @@ namespace mlEncodedDB
 
             if (file.Length == 0)
             {
-                var a = new BlockTableEntry(sizeof(int) + 1, BlockTableEntry.EncodedSize * 64, -1, false);
+                var a = new BlockTableEntry(sizeof(int) + 1, BlockTableEntry.EncodedSize * BlockTableLength, -1, false);
 
                 var ev = new EncodedValue(1);
 
@@ -362,7 +364,7 @@ namespace mlEncodedDB
             {
                 handle.Seek(curr.StartPos, SeekOrigin.Begin);
 
-                n = Math.Min(64, blockCount - x);
+                n = Math.Min(BlockTableLength, blockCount - x);
 
                 for (int c = 1; c <= n; c++)
                 {
@@ -438,7 +440,7 @@ namespace mlEncodedDB
 
         private long FindBTEPosition(int bteIndex)
         {
-            var tableID = bteIndex / 512;
+            var tableID = bteIndex / BlockTableLength;
 
             BlockTableEntry curr = btes[0];
 
@@ -452,7 +454,7 @@ namespace mlEncodedDB
 
             if (x < tableID) { return -1L; } // x is beyond the end of the chain
 
-            var r = bteIndex % 512;
+            var r = bteIndex % BlockTableLength;
 
             return curr.StartPos + r * BlockTableEntry.EncodedSize;
         }
@@ -487,7 +489,7 @@ namespace mlEncodedDB
 
             int n = btes.Count;
 
-            var newBTE = new BlockTableEntry(eof, BlockTableEntry.EncodedSize * 64, -1, false);
+            var newBTE = new BlockTableEntry(eof, BlockTableEntry.EncodedSize * BlockTableLength, -1, false);
 
             var newCurr = new BlockTableEntry(curr.StartPos, curr.Length, n, false);
 

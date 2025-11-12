@@ -354,7 +354,7 @@ namespace mlLinuxPath
             }
             else { path = this; }
 
-            string ret = CommandHelper.Bash($"ls -lna {path.Path}").StandardOutput.Replace("'", string.Empty);
+            string ret = CommandHelper.Bash($"ls -lna '{path.Path}'").StandardOutput.Replace("'", string.Empty);
 
             var m = LinuxFileInfo.lsRegex.Matches(ret);
 
@@ -373,7 +373,7 @@ namespace mlLinuxPath
             {
                 if (EndType == DestType.File || EndType == DestType.SymLink)
                 {
-                    ret = CommandHelper.Bash($"ls -lna {Path}").StandardOutput.Replace("'", string.Empty);
+                    ret = CommandHelper.Bash($"ls -lna '{Path}'").StandardOutput.Replace("'", string.Empty);
 
                     m = LinuxFileInfo.lsRegex.Matches(ret);
 
