@@ -26,12 +26,11 @@ mlstack <command> [switches] <stack> [arguments]
 
 The following commands are currently in use:
 
-**Command**         **Description**
-init                Initializes a new empty stack file at the specified path.
-stack               Creates a new level (snapshot) of a source directory and adds it to the stack file.
-list-levels         Lists all levels (snapshots) contained within the stack file.
-prune               Deletes the oldest levels in the stack, keeping a specified number of the most recent levels.
-delete-level        Deletes a specific level from the stack using its ID.
-recover-file        Searches the stack for a file matching a pattern and recovers it to an output location.
+init
+stack
+list-levels
+prune
+delete-level
+recover-file
 
 Pass --help for a full list of commands and switches.
