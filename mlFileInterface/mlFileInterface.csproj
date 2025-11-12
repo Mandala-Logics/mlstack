@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DDEncoder/DDEncoder.csproj" />
+    <ProjectReference Include="../mlStringValidation/mlStringValidation.csproj" />
+  </ItemGroup>
+
+</Project>

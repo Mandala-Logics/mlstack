@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../mlArchive/mlArchive.csproj" />
+    <ProjectReference Include="../mlCommand/mlCommand.csproj" />
+    <ProjectReference Include="../mlLinuxPath/mlLinuxPath.csproj" />
+    <ProjectReference Include="../mlLogger/mlLogger.csproj" />
+    <ProjectReference Include="../mlStackLib/mlStackLib.csproj" />
+    <EmbeddedResource Include="cmd.main.template" />
+    <EmbeddedResource Include="help.main.txt" />
+  </ItemGroup>
+
+</Project>

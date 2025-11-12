@@ -1,0 +1,118 @@
+# mlstack Command-Line Utility Help #
+
+The mlstack utility is designed to manage file stacks, allowing you to create snapshots of a directory, list the snapshots (levels), prune older levels, delete specific levels, and recover individual files.
+
+
+
+## Global Usage: ##
+
+mlstack <command> [switches] <stack> [arguments]
+
+
+
+## Commands: ##
+
+[Command]           [Description]
+init                Initializes a new empty stack file at the specified path.
+stack               Creates a new level (snapshot) of a source directory and adds it to the stack file.
+list-levels         Lists all levels (snapshots) contained within the stack file.
+prune               Deletes the oldest levels in the stack, keeping a specified number of the most recent levels.
+delete-level        Deletes a specific level from the stack using its ID.
+recover-file        Searches the stack for a file matching a pattern and recovers it to an output location.
+
+
+
+## Detailed command referance: ##
+
+
+
+### init <stack> ###
+
+Initializes a new empty stack file.
+
+[Argument]      [Description]                                           [Required]
+<stack>         The path where the new stack file will be created.      Yes (1)
+
+~Example: mlstack init ~/backups/project.stack
+
+
+
+### stack <stack> <src> ###
+
+Creates a new level (snapshot) from a source directory (<src>) and saves it to the stack file (<stack>).
+
+[Argument]      [Description]                                                                                   [Required]
+<stack>         The path to the stack file to work on.                                                          Yes (1)
+<src>           The path to the directory whose contents will be stacked (snapshotted). Must be a directory.	Yes (1)
+
+[Switch]    [Short]     [Description]
+--new       -n          (Optional) If the stack file does not exist, use this switch to initialize a new one before stacking.
+--force     -f          (Optional) Bypasses the check that ensures the source path (<src>) is the same as the directory used for the previous level.
+
+~Example: mlstack stack --force ~/backups/project.stack ~/project/source
+
+
+
+### list-levels <stack> ###
+
+Displays a table of all saved levels in the stack, including their ID, creation date, file count, and original path.
+
+[Argument]      [Description]                   [Required]
+<stack>	        The path to the stack file.	    Yes (1)
+
+~Example: mlstack list-levels ~/backups/project.stack
+
+
+
+### prune <stack> <keep-levels> ###
+
+[Argument]      [Description]                                                                                                   [Required]
+<stack>         The path to the stack file.	                                                                                    Yes (1)
+<keep-levels>   The number of most recent levels to keep. Older levels will be deleted. (e.g., 5 to keep the last 5 levels).	Yes (1)
+
+[Switch]    [Short]     [Description]
+--yes       -y          (Optional) Automatically answers "yes" to the confirmation prompt before deleting levels.
+
+~Example: mlstack prune ~/backups/project.stack 10
+
+(This will delete all but the 10 most recent levels.)
+
+
+
+### delete-level <stack> <levelID> ###
+
+Deletes a specific level from the stack using its unique ID.
+
+[Argument]      [Description]                                                           [Required]
+<stack>         The path to the stack file.                                             Yes (1)
+<levelID>       The unique ID of the level to delete (can be found using list-levels).	Yes (1)
+
+~Example: mlstack delete-level ~/backups/project.stack acbd
+
+
+
+### recover-file --output <dest> <stack> <pattern> ###
+
+Searches the stack for a file matching a pattern and recovers it to a specified destination. The pattern uses wildcard.
+
+[Argument]      [Description]                                                                   [Required]
+<stack>         The path to the stack file.	                                                    Yes (1)
+<pattern>       A wildcard regex pattern to search for the file (e.g., *.cs, src/file.txt).     Yes (1)
+
+
+[Switch]        [Short]         [Description]
+--output        -o              (Mandatory) Specifies the destination path (<dest>) where the recovered file will be written.
+--level         -l              (Optional) Allows you to specify the levelID to recover the file from, bypassing the interactive prompt if multiple levels contain the matching file.
+
+~Examples:
+
+mlstack recover-file --output ~/recovered/Program_backup.cs ~/backups/project.stack Program.cs 
+mlstack recover-file --level ml01 --output ~/recovered/Program_v2.cs ~/backups/project.stack Program.cs 
+
+
+
+
+~ A utility by Mandala Logics (https://github.com/Mandala-Logics) ~
+
+
+

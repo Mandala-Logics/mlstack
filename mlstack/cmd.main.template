@@ -1,0 +1,25 @@
+1^mlstack
+| ?%help+h
+| 2+^stack
+| | ?%new+n
+| | ?%force+f
+| | 1$stack
+| | 1$src
+| 1^init
+| | 1$stack
+| 1^list-levels
+| | 1$stack
+| 2-3^recover-file
+| | ?%level+l
+| | | $levelID
+| | 1%output+o
+| | | $dest
+| | 1$stack
+| | 1$pattern
+| 2-3^prune
+| | ?%yes+y
+| | 1$stack
+| | 1$keep-levels
+| 2^delete-level
+| | 1$stack
+| | 1$levelID
