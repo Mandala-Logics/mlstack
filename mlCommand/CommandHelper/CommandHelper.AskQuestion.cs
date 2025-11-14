@@ -38,7 +38,7 @@ namespace mlCommand
             } while (true);
         }
 
-        public static int AskListQuestion(string question, params object[] list)
+        public static int AskListQuestion<T>(string question, IEnumerable<T> list)
         {
             return AskListQuestion(question, list.ToList());
         }

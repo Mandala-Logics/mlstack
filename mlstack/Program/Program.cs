@@ -27,11 +27,11 @@ internal static partial class Program
     {
         if (Debugger.IsAttached)
         {
-            //args = "list-levels ~/test.stack".Split(' ');
+            args = "list-levels ~/test.stack".Split(' ');
             //args = "init ~/test.stack".Split(' ');
-            args = "stack -n ~/test.stack ~/stacktest".Split(' ');
+            //args = "stack -n ~/test.stack ~/stacktest".Split(' ');
             //args = "--help".Split(' ');
-            //args = "recover-file -o ~/sb.png ~/test.stack sb".Split(' ');
+            //args = "recover-file -o ~/this.txt ~/test.stack 30".Split(' ');
         }
         
         var cmdLineTemplate = new CommandTree(CommandHelper.GetAssemblyStreamReader("cmd.main.template"));
@@ -80,7 +80,10 @@ internal static partial class Program
 
     private static void UnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        Logger.LogException((Exception)e.ExceptionObject, LogLevel.Fatal);
+        var ex = (Exception)e.ExceptionObject;
+
+        Logger.LogException(ex, LogLevel.Fatal);
+
         Environment.Exit((int)ProgramExitCodes.UnhandledExpcetion);
     }
 

@@ -74,7 +74,7 @@ namespace mlAutoCollection.Sync
                 Array.Copy(baseList.ToArray(), 0, array, arrayIndex, arr.Length);
             }
         }
-        public IEnumerator<T> GetEnumerator() => GetValues().GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)GetValues()).GetEnumerator();
+        public IEnumerator<T> GetEnumerator() => new SyncedEnumerator<T>(baseList);
+        IEnumerator IEnumerable.GetEnumerator() => new SyncedEnumerator<T>(baseList);
     }
 }

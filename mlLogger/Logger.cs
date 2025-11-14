@@ -25,8 +25,12 @@ namespace mlLogger
             Console.WriteLine($"EXCEPTION[{level}]:".ToUpper());
             Console.WriteLine(e.FormatException());
 
-            Console.Error.WriteLine($"EXCEPTION[{level}]:".ToUpper());
-            Console.Error.WriteLine(e.FormatException());
+            if (e.InnerException is Exception inner)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"INNER EXCEPTION:".ToUpper());
+                Console.WriteLine(inner.FormatException());
+            }
 
             AfterLogException(e, level);
         }

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace mlAutoCollection.Sync
 {
@@ -157,14 +158,8 @@ namespace mlAutoCollection.Sync
             }
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            return GetValues().GetEnumerator();
-        }
+        public IEnumerator<T> GetEnumerator() => new SyncedEnumerator<T>(baseList);
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetValues().GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => new SyncedEnumerator<T>(baseList);
     }
 }

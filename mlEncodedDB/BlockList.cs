@@ -357,8 +357,6 @@ namespace mlEncodedDB
             int n;
 
             var handle = file.GetHandle();
-        
-            var tasks = new List<IOTask>();
 
             do
             {
@@ -368,10 +366,17 @@ namespace mlEncodedDB
 
                 for (int c = 1; c <= n; c++)
                 {
-                    tasks.Add(handle.Decode());
+                    handle.Decode();
                 }
 
                 x += n;
+
+                while (handle.Count > 0)
+                {
+                    var bte = (BlockTableEntry)handle.WaitNext().DecodedObject.Value;
+
+                    btes.Add(bte);
+                }
 
                 if (curr.NextBlock > 0)
                 {
@@ -380,13 +385,6 @@ namespace mlEncodedDB
                 else if (curr.NextBlock == -1 && x < blockCount)
                 {
                     throw new Exception("Cannot read all blocks?");
-                }
-
-                foreach (var task in tasks)
-                {
-                    var bte = (BlockTableEntry)task.DecodedObject.Value;
-
-                    btes.Add(bte);
                 }
 
             } while (x < blockCount);
@@ -411,6 +409,11 @@ namespace mlEncodedDB
 
         private int CreateBlock(int length)
         {
+            if (btes.Count % BlockTableLength == BlockTableLength - 4)
+            {
+                ExpandBlockTable();
+            }
+
             long fileLen = btes[^1].EndPos;
 
             var bte = new BlockTableEntry(fileLen, Math.Max(length, 128), -1, true);
@@ -420,12 +423,6 @@ namespace mlEncodedDB
             int n = btes.Count - 1;
 
             var pos = FindBTEPosition(n);
-
-            if (pos == -1L)
-            {
-                ExpandBlockTable();
-                pos = FindBTEPosition(n);
-            }
 
             var handle = file.GetHandle();
 

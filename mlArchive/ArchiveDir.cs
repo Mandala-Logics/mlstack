@@ -243,7 +243,7 @@ namespace ArcV4
             {
                 foreach (FileTableEntry fte in Dir)
                 {
-                    tc?.ThrowIfAborted();
+                    if (tc.Aborting) { return;}
 
                     if (fte.Deleted) continue;
 
@@ -257,7 +257,7 @@ namespace ArcV4
 
                 foreach (FileTableEntry fte in Dir)
                 {
-                    tc?.ThrowIfAborted();
+                    if (tc.Aborting) { return;}
 
                     if (fte.Deleted) continue;
 

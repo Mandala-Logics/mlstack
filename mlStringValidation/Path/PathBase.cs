@@ -470,7 +470,10 @@ namespace mlStringValidation.Path
             }
 
             try { src.CopyTo(dst); }
-            catch (Exception e) { throw new IOException("Failed to copy file.", e); }
+            catch (Exception e)
+            {
+                throw new IOException("Failed to copy file.", e);
+            }
             finally
             {
                 dst.Dispose();

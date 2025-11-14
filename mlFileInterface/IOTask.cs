@@ -219,7 +219,7 @@ namespace mlFileInterface
         }
         public virtual void Dispose()
         {
-            stream?.Dispose();
+            //stream?.Dispose();
         }
         public virtual EncodedValue WaitOnObject()
         {
@@ -268,7 +268,7 @@ namespace mlFileInterface
         //PROTECTED METHODS
         public virtual void OnCancelled()
         {
-            stream?.Dispose();
+            //stream?.Dispose();
         }
     }
 }

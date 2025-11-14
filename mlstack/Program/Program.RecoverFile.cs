@@ -72,6 +72,7 @@ internal static partial class Program
         {
             stream = dest.OpenStream(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             Stack.RetriveFile(searchResults[0].BulkID, stream);
+            stream.Flush();
             return;
         }
 
@@ -123,6 +124,7 @@ internal static partial class Program
         {
             stream = dest.OpenStream(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             Stack.RetriveFile(searchResults[0].BulkID, stream);
+            stream.Flush();
             return;
         }
         else
@@ -131,6 +133,7 @@ internal static partial class Program
 
             stream = dest.OpenStream(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             Stack.RetriveFile(searchResults[index].BulkID, stream);
+            stream.Flush();
             return;
         }
     }

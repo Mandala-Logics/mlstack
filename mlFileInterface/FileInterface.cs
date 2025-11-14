@@ -349,7 +349,6 @@ namespace mlFileInterface
             EncodedValue ev;
             byte[] buffer;
             int len, c, n;
-            SpinWait waiter = new SpinWait();
 
             do
             {
@@ -411,12 +410,15 @@ namespace mlFileInterface
                             case TaskType.Encode:
                             case TaskType.Write:
 
-                                try
+                                if (!task.Cancelled)
                                 {
-                                    task.stream.Position = 0L;
-                                    task.stream.CopyTo(baseStream);
+                                    try
+                                    {
+                                        task.stream.Position = 0L;
+                                        task.stream.CopyTo(baseStream);
+                                    }
+                                    catch (ObjectDisposedException) { }
                                 }
-                                catch (ObjectDisposedException) { }
                                 
                                 break;
                             
@@ -474,14 +476,17 @@ namespace mlFileInterface
 
                     task.SetEndPosition(baseStream.Position);
 
-                    try { task.stream?.Seek(0L, SeekOrigin.Begin); }
-                    catch (ObjectDisposedException) { }
+                    if (!task.Cancelled)
+                    {
+                        try { task.stream?.Seek(0L, SeekOrigin.Begin); }
+                        catch (ObjectDisposedException) { }
+                    }
                 }
 
                 baseStream.Flush();
-                waiter.SpinOnce();
+                SpinWait.SpinUntil(() => joinSignal || queue.Count > 0);
 
-            } while (!(joinSignal && queue.Count == 0));
+            } while (!joinSignal);
         }
     }
 }
