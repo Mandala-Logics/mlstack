@@ -29,7 +29,7 @@ internal static partial class Program
         {
             //args = "list-levels ~/test.stack".Split(' ');
             //args = "init ~/test.stack".Split(' ');
-            args = "stack -n ~/test.stack ~/stacktest".Split(' ');
+            args = "stack -n ~/test.stack ~/repos/mlstack".Split(' ');
             //args = "--help".Split(' ');
             //args = "recover-file -o ~/this.txt ~/test.stack 30".Split(' ');
         }

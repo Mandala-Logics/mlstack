@@ -38,7 +38,7 @@ internal static partial class Program
                 }
             }
         }
-
+        
         mlStringValidation.Path.ObjectTreeNode<PathBase> tree;
 
         try { tree = path.Tree(); }

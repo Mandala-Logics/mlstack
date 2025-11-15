@@ -118,6 +118,7 @@ namespace mlStackLib
             if (c == 0) { throw new ArgumentException("List of paths cannot be empty."); }
 
             string id;
+            int[] hash;
 
             var li = new LevelInfo(GetNewLevelID(), c, metadata);
 
@@ -126,7 +127,8 @@ namespace mlStackLib
                 logger?.LogMessage("Stacking file: " + path.Path, LogLevel.Important);
 
                 var length = path.FileLength();
-                var hash = path.Hash();
+
+                var stream = path.Hash(out hash);
 
                 if (FindBulkID(length, hash) is string a)
                 {
@@ -135,14 +137,13 @@ namespace mlStackLib
                 else
                 {
                     id = GetNewBulkID();
+                    stream.Seek(0L, SeekOrigin.Begin);
 
-                    try { AddFileToBulk(path, hash, length, id); }
-                    catch (PathAccessException)
-                    {
-                        throw new PathAccessException($"Could not open source file '{path}', file may already be open.");
-                    }
+                    try { AddFileToBulk(stream, hash, length, id); }
+                    catch (PathAccessException) { logger?.LogMessage($"Failed to stack file '{path.Path}', fle might be open.", LogLevel.Important); }
                 }
 
+                stream.Dispose();
                 li.AppendFile(id, path);
             }
 
@@ -301,7 +302,7 @@ namespace mlStackLib
             return ret;
         }
 
-        private void AddFileToBulk(PathBase path, int[] hash, long length, string id)
+        private void AddFileToBulk(Stream stream, int[] hash, long length, string id)
         {
             var bdi = new BulkDataInfo(id, hash, length);
 
@@ -309,7 +310,9 @@ namespace mlStackLib
 
             var dest = bulkDir.Append(id, DestType.File);
 
-            path.CopyFile(dest);
+            var destStream = dest.OpenStream(FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+
+            stream.CopyTo(destStream);
         }
     
         private string GetNewBulkID()

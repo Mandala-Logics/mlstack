@@ -1130,22 +1130,22 @@ namespace mlStringValidation.Path
             }
         }
         
-        public int[] Hash()
+        public Stream Hash(out int[] hash)
         {
             if (!Exists) { throw new PathException("File does not exist."); }
             else if (!IsFile) { throw new PathException("Cannot take checksum of directory or hardlink."); }
 
             using var md5 = MD5.Create();
 
-            using var stream = OpenStream(FileMode.Open, FileAccess.Read, FileShare.Read);
+            var stream = OpenStream(FileMode.Open, FileAccess.Read, FileShare.Read);
 
-            var hash = md5.ComputeHash(stream);
+            var x = md5.ComputeHash(stream);
 
-            var ret = new int[hash.Length / sizeof(int)];
+            hash = new int[x.Length / sizeof(int)];
 
-            Buffer.BlockCopy(hash, 0, ret, 0, hash.Length);
+            Buffer.BlockCopy(hash, 0, hash, 0, hash.Length);
 
-            return ret;
+            return stream;
         }
 
         //INTERFACE METHODS

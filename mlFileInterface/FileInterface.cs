@@ -341,24 +341,16 @@ namespace mlFileInterface
         //PRIVATE FUNCTIONS
         private void IOLoop()
         {
-            IOTask task = null;
+            IOTask task;
             EncodedType et;
             EncodedValue ev;
             byte[] buffer;
             int len, c, n;
+            SpinWait waiter = new SpinWait();
 
             while (!joinSignal)
             {
-                SpinWait.SpinUntil(() => queue.Count > 0 || joinSignal);
-
-                if (joinSignal)
-                {
-                    baseStream.Flush(); 
-
-                    return;
-                }
-
-                queue.TryDequeue(out task);
+                if (!queue.TryDequeue(out task)) { waiter.SpinOnce(); continue; }
 
                 completed++;
                 Progress = completed/total;

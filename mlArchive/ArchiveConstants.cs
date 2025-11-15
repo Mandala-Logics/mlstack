@@ -10,7 +10,7 @@ namespace ArcV4
         public readonly static int FileHeaderLength = new ArchiveFileHeader(null, "temp").GetEncodedSize();
         public readonly static int BlockTableEntryLength = new BlockTableEntry(-1, BlockType.Empty, 1000, MinBlockLength).GetEncodedSize();
 
-        public static readonly int BlockTableBlockCount = 512;
+        public static readonly int BlockTableBlockCount = 64;
         public readonly static int BlockTableSize = BlockTableEntryLength * BlockTableBlockCount;
 
         public readonly static int MaxFileNameLength = 128;
