@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using ArcV4;
 using DDEncoder;
-using mlAutoCollection.Cast;
 using mlEncodedDB;
+using mlLogger;
 using mlStringValidation.Path;
 
 namespace mlStackLib
@@ -16,7 +16,7 @@ namespace mlStackLib
         private readonly PathBase bulkDir;
         private readonly BlockList bulkDB;
         private readonly BlockList levelDB;
-        private ArchiveV4 arc;
+        private readonly ArchiveV4 arc;
 
         public BlockList Metadata { get; }
 
@@ -103,7 +103,7 @@ namespace mlStackLib
             stream.CopyTo(outputStream);
         }
 
-        public void CreateLevel(IEnumerable<PathBase> paths, IEncodable? metadata)
+        public void CreateLevel(IEnumerable<PathBase> paths, IEncodable? metadata, Logger? logger)
         {
             if (arc.Disposed) { throw new ObjectDisposedException("filestack"); }
 
@@ -123,6 +123,8 @@ namespace mlStackLib
 
             foreach (var path in paths)
             {
+                logger?.LogMessage("Stacking file: " + path.Path, LogLevel.Important);
+
                 var length = path.FileLength();
                 var hash = path.Hash();
 
@@ -317,6 +319,7 @@ namespace mlStackLib
             do
             {
                 ret = DDHash.RandomHash.ToString("x8");
+            //} while (false);
             } while (bulkDB.Any((bdi) => { return ((BulkDataInfo)bdi).BulkID.Equals(ret); }));
 
             return ret;

@@ -19,6 +19,7 @@ namespace mlEncodedDB
         private readonly FileInterface file;
         private readonly SyncedList<BlockTableEntry> btes;
         private readonly BlockListCounter counter;
+        private readonly BlockListCache cache;
 
         static BlockList()
         {
@@ -70,6 +71,7 @@ namespace mlEncodedDB
             }
 
             counter = new BlockListCounter(this);
+            cache = new BlockListCache(1024);
         }
 
         public void Add(IEncodable obj)
@@ -99,11 +101,12 @@ namespace mlEncodedDB
                 handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
                 handle.Write(b, written, n);
 
-                handle.WaitAll();
+                //handle.WaitAll();
 
                 written += n;
             }
 
+            cache.TrySet(Count, obj);
             counter.Incrament(1);
         }
 
@@ -145,7 +148,18 @@ namespace mlEncodedDB
 
         public IEncodable Get(int objIndex)
         {
-            return ReadObject(FindBTEIndex(objIndex));
+            if (cache.TryGet(objIndex, out IEncodable? x))
+            {
+                return x;
+            }
+            else
+            {
+                var ret = ReadObject(FindBTEIndex(objIndex));
+
+                cache.TrySet(objIndex, ret);
+
+                return ret;
+            }
         }
 
         public List<IEncodable> GetAll()
@@ -188,6 +202,7 @@ namespace mlEncodedDB
             }
 
             counter.Clear();
+            cache.Clear();
         }
 
         public void Remove(int objIndex)
@@ -235,6 +250,8 @@ namespace mlEncodedDB
 
                 bteIndex = btes[bteIndex].NextBlock;
             }
+
+            cache.TrySet(objIndex, obj);
         }
 
         private List<int> GetChain(int bteIndex)
@@ -392,9 +409,7 @@ namespace mlEncodedDB
         
         private void WriteBlockCount()
         {
-            var handle = file.GetHandle();
-
-            handle.Encode(btes.Count);
+            file.Encode(SeekOrigin.Begin, 0L, btes.Count);
         }
 
         private int GetEmptyBlock(int length)
@@ -463,11 +478,7 @@ namespace mlEncodedDB
             if (pos == -1L) { throw new Exception("Unable to find BTE position."); }
             else
             {
-                var handle = file.GetHandle();
-
-                handle.Seek(pos, SeekOrigin.Begin);
-
-                handle.Encode(btes[bteIndex]);
+                file.Encode(SeekOrigin.Begin, pos, btes[bteIndex]);
             }
         }
 

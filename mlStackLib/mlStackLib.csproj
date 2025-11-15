@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../mlArchive/mlArchive.csproj" />
     <ProjectReference Include="../mlEncodedDB/mlEncodedDB.csproj" />
+    <ProjectReference Include="../mlLogger/mlLogger.csproj" />
     <ProjectReference Include="../mlStringValidation/mlStringValidation.csproj" />
   </ItemGroup>
 

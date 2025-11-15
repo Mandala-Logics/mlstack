@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using DDEncoder;
 
@@ -15,6 +16,7 @@ namespace mlEncodedDB
 
             private readonly BlockList owner;
             private int pos;
+            private int n;
             private List<int> skip;
 
             public BlockListEnumerator(BlockList owner)
@@ -46,7 +48,18 @@ namespace mlEncodedDB
                     {
                         if (owner.btes[pos].NextBlock > 0) { skip.Add(owner.btes[pos].NextBlock); }
 
-                        Current = owner.ReadObject(pos);
+                        if (owner.cache.TryGet(n, out IEncodable? x))
+                        {
+                            Current = x;
+                        }
+                        else
+                        {
+                            Current = owner.ReadObject(pos);
+
+                            owner.cache.TrySet(n, Current);
+                        }
+
+                        n++;
 
                         return true;
                     }
@@ -58,6 +71,7 @@ namespace mlEncodedDB
             public void Reset()
             {
                 pos = -1;
+                n = 0;
                 skip = new List<int>() { 0 };
             }
         }

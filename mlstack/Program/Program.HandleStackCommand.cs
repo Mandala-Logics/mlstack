@@ -73,7 +73,7 @@ internal static partial class Program
             return;
         }
 
-        try { Stack.CreateLevel(ls, new LevelMetadata(path.Path)); }
+        try { Stack.CreateLevel(ls, new LevelMetadata(path.Path), Logger); }
         catch (PathAccessException e)
         {
             Exit(ProgramExitCodes.IOError, e.Message);

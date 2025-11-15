@@ -67,7 +67,7 @@ namespace ArcV4
             FileHeader = new ArchiveFileHeader(collectionHandle, name);
 
             Root = new ArchiveRoot(this);
-            RootPath = Root.Path;
+            RootPath = Root.Path;            
 
             Interface = new FileInterface(path, fileMode);
 

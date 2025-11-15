@@ -69,7 +69,7 @@ internal static partial class Program
             try { Stack = FileStack.OpenStack(path); }
             catch (ArgumentException e)
             {
-                Logger.LogException(e, LogLevel.Fatal);
+                //Logger.LogException(e, LogLevel.Fatal);
                 Exit(ProgramExitCodes.BadCommandLine, $"Supplied path ({path.Path}) does not appear to point to a valid stack.");
                 return;
             }

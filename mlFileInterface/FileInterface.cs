@@ -58,8 +58,6 @@ namespace mlFileInterface
 
             ioThread?.Join();
 
-            baseStream?.Flush();
-
             baseStream?.Dispose();
 
             Disposed = true;
@@ -343,150 +341,139 @@ namespace mlFileInterface
         //PRIVATE FUNCTIONS
         private void IOLoop()
         {
-            int tries;
-            IOTask task;
+            IOTask task = null;
             EncodedType et;
             EncodedValue ev;
             byte[] buffer;
             int len, c, n;
 
-            do
+            while (!joinSignal)
             {
-                while (queue.Count > 0)
+                SpinWait.SpinUntil(() => queue.Count > 0 || joinSignal);
+
+                if (joinSignal)
                 {
-                    tries = -1;
+                    baseStream.Flush(); 
 
-                    do
+                    return;
+                }
+
+                queue.TryDequeue(out task);
+
+                completed++;
+                Progress = completed/total;
+
+                if (task.IsCancelled())
+                {
+                    task.stream?.Dispose();                        
+                    continue;
+                }
+
+                try
+                {
+                    if (!task.StartPosStruct.SetPosition(ref baseStream))
                     {
-                        tries++;
-
-                        if (tries > 10)
-                        {
-                            threadException = new Exception("Failed to dequeue next task after 10 tries.");
-                            return;
-                        }
-
-                    } while (!queue.TryDequeue(out task));
-
-                    completed++;
-                    Progress = completed/total;
-
-                    if (task.IsCancelled())
-                    {
-                        task.stream?.Dispose();                        
+                        task.Cancel();
                         continue;
                     }
 
-                    try
+                    switch (task.Type)
                     {
-                        if (!task.StartPosStruct.SetPosition(ref baseStream))
-                        {
-                            task.Cancel();
-                            continue;
-                        }
+                        case TaskType.Read:
 
-                        switch (task.Type)
-                        {
-                            case TaskType.Read:
+                            buffer = new byte[task.readLength];
 
-                                buffer = new byte[task.readLength];
+                            len = c = 0;
 
-                                len = c = 0;
+                            do
+                            {
+                                if (c >= 10) break;
 
-                                do
-                                {
-                                    if (c >= 10) break;
+                                len += baseStream.Read(buffer, len, buffer.Length - len);
 
-                                    len += baseStream.Read(buffer, len, buffer.Length - len);
+                                c++;
 
-                                    c++;
+                            } while (len < buffer.Length);                          
 
-                                } while (len < buffer.Length);                          
+                            task.stream = new MemoryStream(buffer, 0, len, false, true);
 
-                                task.stream = new MemoryStream(buffer, 0, len, false, true);
+                            //r++;
 
-                                break;
+                            break;
 
-                            case TaskType.Encode:
-                            case TaskType.Write:
+                        case TaskType.Encode:
+                        case TaskType.Write:
 
-                                if (!task.Cancelled)
-                                {
-                                    try
-                                    {
-                                        task.stream.Position = 0L;
-                                        task.stream.CopyTo(baseStream);
-                                    }
-                                    catch (ObjectDisposedException) { }
-                                }
-                                
-                                break;
+                            if (!task.Cancelled)
+                            {
+                                task.stream?.Seek(0L, SeekOrigin.Begin);
+                                task.stream?.CopyTo(baseStream);
+                            }
                             
-                            case TaskType.Scramble:
-                            
-                                buffer = DDHash.GetRandomBytes(Math.Min(256, task.readLength));
+                            break;
+                        
+                        case TaskType.Scramble:
+                        
+                            buffer = DDHash.GetRandomBytes(Math.Min(256, task.readLength));
 
-                                n = 0;
+                            n = 0;
 
-                                while (n < task.readLength)
+                            while (n < task.readLength)
+                            {
+                                c = Math.Min(buffer.Length, task.readLength - n);
+
+                                baseStream.Write(buffer, 0, c);
+
+                                unchecked
                                 {
-                                    c = Math.Min(buffer.Length, task.readLength - n);
-
-                                    baseStream.Write(buffer, 0, c);
-
-                                    unchecked
+                                    if ((n += c) < task.readLength)
                                     {
-                                        if ((n += c) < task.readLength)
-                                        {
-                                            DDHash.Shuffle(buffer);
-                                        }
+                                        DDHash.Shuffle(buffer);
                                     }
                                 }
+                            }
 
-                                break;
+                            break;
 
-                            case TaskType.Truncate:
+                        case TaskType.Truncate:
 
-                                baseStream.SetLength(baseStream.Position);
-                                break;
+                            baseStream.SetLength(baseStream.Position);
+                            break;
 
-                            case TaskType.Decode:
+                        case TaskType.Decode:
 
-                                baseStream.ReadEncodedType(out et);
+                            baseStream.ReadEncodedType(out et);
 
-                                if (et == EncodedType.Object)
-                                {
-                                    EncodedObject.Read(baseStream, out ev);
-                                }
-                                else if (et == EncodedType.Array)
-                                {
-                                    EncodedArray.Read(baseStream, out ev);
-                                }
-                                else
-                                {
-                                    EncodedValue.Read(baseStream, et, out ev);
-                                }
+                            if (et == EncodedType.Object)
+                            {
+                                EncodedObject.Read(baseStream, out ev);
+                            }
+                            else if (et == EncodedType.Array)
+                            {
+                                EncodedArray.Read(baseStream, out ev);
+                            }
+                            else
+                            {
+                                EncodedValue.Read(baseStream, et, out ev);
+                            }
 
-                                task.SetDecodedValue(ev);
+                            task.SetDecodedValue(ev);
 
-                                break;
-                        }
-                    }
-                    catch (Exception e) { task.SetException(e); continue; }
-
-                    task.SetEndPosition(baseStream.Position);
-
-                    if (!task.Cancelled)
-                    {
-                        try { task.stream?.Seek(0L, SeekOrigin.Begin); }
-                        catch (ObjectDisposedException) { }
+                            break;
                     }
                 }
+                catch (Exception e) { task.SetException(e); continue; }
 
-                baseStream.Flush();
-                SpinWait.SpinUntil(() => joinSignal || queue.Count > 0);
+                task.SetEndPosition(baseStream.Position);
 
-            } while (!joinSignal);
+                if (!task.Cancelled)
+                {
+                    task.stream?.Seek(0L, SeekOrigin.Begin);
+                }
+
+            }
+
+            baseStream.Flush();
         }
     }
 }

@@ -90,7 +90,7 @@ namespace mlFileInterface
 
         //PRIVATE PROPERTIES
         private TaskCompletionSource<IOTask> tcs;
-        internal MemoryStream stream;
+        internal MemoryStream? stream = null;
         internal int readLength;
 
         //CONTRUCTORS
@@ -219,7 +219,7 @@ namespace mlFileInterface
         }
         public virtual void Dispose()
         {
-            //stream?.Dispose();
+            stream = null;
         }
         public virtual EncodedValue WaitOnObject()
         {
@@ -268,7 +268,7 @@ namespace mlFileInterface
         //PROTECTED METHODS
         public virtual void OnCancelled()
         {
-            //stream?.Dispose();
+            stream = null;
         }
     }
 }

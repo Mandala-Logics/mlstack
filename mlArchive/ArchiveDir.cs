@@ -212,7 +212,9 @@ namespace ArcV4
         {
             if (flushThread?.ThreadRunning ?? false) { flushThread.AwaitAbort(); }
 
-            flushThread = Archive.Threads.StartTask(DoFlush, ThreadTaskPriority.MustBeCompleted);            
+            DoFlush(null);
+
+            //flushThread = Archive.Threads.StartTask(DoFlush, ThreadTaskPriority.MustBeCompleted);            
         }
         private IEnumerable<FileTableEntry> ReadDir(int count)
         { 
@@ -243,7 +245,7 @@ namespace ArcV4
             {
                 foreach (FileTableEntry fte in Dir)
                 {
-                    if (tc.Aborting) { return;}
+                    if (tc?.Aborting ?? false) { return;}
 
                     if (fte.Deleted) continue;
 
@@ -257,7 +259,7 @@ namespace ArcV4
 
                 foreach (FileTableEntry fte in Dir)
                 {
-                    if (tc.Aborting) { return;}
+                    if (tc?.Aborting ?? false) { return;}
 
                     if (fte.Deleted) continue;
 

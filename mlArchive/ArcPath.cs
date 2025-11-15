@@ -307,7 +307,9 @@ namespace ArcV4
 
                     if (Exists) throw new PathAccessException(this, $"File already exists and Filemode is CreateNew: {this}");
 
-                    ret = CreateFile().OpenStream(fileAccess, fileShare);
+                    var file = CreateFile();
+                    
+                    ret = file.OpenStream(fileAccess, fileShare);
 
                     break;
 

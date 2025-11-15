@@ -469,10 +469,13 @@ namespace mlStringValidation.Path
                 throw new PathAccessException(this, $"Failed to open stream for copying.", e);
             }
 
-            try { src.CopyTo(dst); }
+            try
+            {
+                src.CopyTo(dst);
+            }
             catch (Exception e)
             {
-                throw new IOException("Failed to copy file.", e);
+                throw new IOException("Failed to copy file: " + Path, e);
             }
             finally
             {

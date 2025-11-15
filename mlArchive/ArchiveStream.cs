@@ -205,8 +205,8 @@ namespace ArcV4
         {
             var handle = DoWrite(buffer, offset, count, default);
 
-            handle.WaitAll();
-            handle.Dispose();
+            //handle.WaitAll();
+            //handle.Dispose();
         }
         public IOHandle DoRead(int count, CancellationToken cancellationToken)
         {
