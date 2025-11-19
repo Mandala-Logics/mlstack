@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using DDEncoder;
 using mlAutoCollection.Sync;
 using mlFileInterface;
@@ -20,6 +21,7 @@ namespace mlEncodedDB
         private readonly SyncedList<BlockTableEntry> btes;
         private readonly BlockListCounter counter;
         private readonly BlockListCache cache;
+        private readonly SemaphoreSlim semaphore;
 
         static BlockList()
         {
@@ -28,6 +30,8 @@ namespace mlEncodedDB
 
         public BlockList(PathBase path, FileMode fileMode)
         {
+            semaphore = new SemaphoreSlim(1);
+
             file = new FileInterface(path, fileMode);
 
             var handle = file.GetHandle();
@@ -72,11 +76,15 @@ namespace mlEncodedDB
 
             counter = new BlockListCounter(this);
             cache = new BlockListCache(1024);
+
+            semaphore.Release();
         }
 
         public void Add(IEncodable obj)
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+
+            semaphore.Wait();
 
             var ms = new MemoryStream();
 
@@ -101,13 +109,15 @@ namespace mlEncodedDB
                 handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
                 handle.Write(b, written, n);
 
-                //handle.WaitAll();
+                handle.WaitAll();
 
                 written += n;
             }
 
             cache.TrySet(Count, obj);
             counter.Incrament(1);
+
+            semaphore.Release();
         }
 
         private int FindBTEIndex(int objIndex)
@@ -148,8 +158,12 @@ namespace mlEncodedDB
 
         public IEncodable Get(int objIndex)
         {
+            semaphore.Wait();
+
             if (cache.TryGet(objIndex, out IEncodable? x))
             {
+                semaphore.Release();
+
                 return x;
             }
             else
@@ -158,12 +172,16 @@ namespace mlEncodedDB
 
                 cache.TrySet(objIndex, ret);
 
+                semaphore.Release();
+
                 return ret;
             }
         }
 
         public List<IEncodable> GetAll()
         {
+            semaphore.Wait();
+
             var skip = new List<int>() { 0 };
             var ret = new List<IEncodable>();
 
@@ -181,10 +199,14 @@ namespace mlEncodedDB
                 }
             }
 
+            semaphore.Release();
+
             return ret;
         }
         public void Clear()
         {
+            semaphore.Wait();
+
             var skip = new List<int>() { 0 };
 
             for (int x = 0; x < btes.Count; x++)
@@ -203,10 +225,14 @@ namespace mlEncodedDB
 
             counter.Clear();
             cache.Clear();
+
+            semaphore.Release();
         }
 
         public void Remove(int objIndex)
         {
+            semaphore.Wait();
+
             var bteIndex = FindBTEIndex(objIndex);
 
             var chain = GetChain(bteIndex);
@@ -219,10 +245,14 @@ namespace mlEncodedDB
             }
 
             counter.Decrament(1);
+
+            semaphore.Release();
         }
 
         public void Set(int objIndex, IEncodable obj)
         {
+            semaphore.Wait();
+
             var bteIndex = FindBTEIndex(objIndex);
 
             using var ms = new MemoryStream();
@@ -252,6 +282,8 @@ namespace mlEncodedDB
             }
 
             cache.TrySet(objIndex, obj);
+
+            semaphore.Release();
         }
 
         private List<int> GetChain(int bteIndex)
