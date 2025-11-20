@@ -22,6 +22,7 @@ namespace mlEncodedDB
         private readonly BlockListCounter counter;
         private readonly BlockListCache cache;
         private readonly SemaphoreSlim semaphore;
+        private volatile int enumsOpen = 0;
 
         static BlockList()
         {
@@ -83,6 +84,7 @@ namespace mlEncodedDB
         public void Add(IEncodable obj)
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
             semaphore.Wait();
 
@@ -124,6 +126,7 @@ namespace mlEncodedDB
         {
             if (objIndex < 0) { throw new IndexOutOfRangeException(); }
             else if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
             var skip = new List<int>() { 0 };
 
@@ -158,6 +161,8 @@ namespace mlEncodedDB
 
         public IEncodable Get(int objIndex)
         {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+
             semaphore.Wait();
 
             if (cache.TryGet(objIndex, out IEncodable? x))
@@ -180,6 +185,8 @@ namespace mlEncodedDB
 
         public List<IEncodable> GetAll()
         {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+
             semaphore.Wait();
 
             var skip = new List<int>() { 0 };
@@ -205,6 +212,9 @@ namespace mlEncodedDB
         }
         public void Clear()
         {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
             semaphore.Wait();
 
             var skip = new List<int>() { 0 };
@@ -231,6 +241,9 @@ namespace mlEncodedDB
 
         public void Remove(int objIndex)
         {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
             semaphore.Wait();
 
             var bteIndex = FindBTEIndex(objIndex);
@@ -251,6 +264,9 @@ namespace mlEncodedDB
 
         public void Set(int objIndex, IEncodable obj)
         {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
             semaphore.Wait();
 
             var bteIndex = FindBTEIndex(objIndex);

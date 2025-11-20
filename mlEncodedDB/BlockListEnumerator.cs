@@ -23,13 +23,12 @@ namespace mlEncodedDB
             {
                 this.owner = owner;
 
+                owner.enumsOpen++;
+
                 Reset();
             }
 
-            public void Dispose()
-            {
-                owner.semaphore.Release();
-            }
+            public void Dispose() { owner.enumsOpen--; }
 
             public bool MoveNext()
             {
@@ -73,8 +72,6 @@ namespace mlEncodedDB
 
             public void Reset()
             {
-                owner.semaphore.Wait();
-
                 pos = -1;
                 n = 0;
                 skip = new List<int>() { 0 };
