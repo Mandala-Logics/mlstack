@@ -1,8 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using DDEncoder;
 
 namespace mlEncodedDB
@@ -18,17 +16,31 @@ namespace mlEncodedDB
             private int pos;
             private int n;
             private List<int> skip;
+            private volatile bool haveDecremented = false;
 
             public BlockListEnumerator(BlockList owner)
             {
                 this.owner = owner;
 
-                owner.enumsOpen++;
-
                 Reset();
             }
 
-            public void Dispose() { owner.enumsOpen--; }
+            ~BlockListEnumerator()
+            {
+                Dispose();
+            }
+
+            public void Dispose()
+            {
+                lock (this)
+                {
+                    if (!haveDecremented)
+                    {
+                        owner.enumsOpen--;
+                        haveDecremented = true;
+                    }
+                }
+            }
 
             public bool MoveNext()
             {
@@ -67,6 +79,15 @@ namespace mlEncodedDB
                     }
                 }
 
+                lock (this)
+                {
+                    if (!haveDecremented)
+                    {
+                        owner.enumsOpen--;
+                        haveDecremented = true;
+                    }
+                }
+
                 return false;
             }
 
@@ -75,6 +96,12 @@ namespace mlEncodedDB
                 pos = -1;
                 n = 0;
                 skip = new List<int>() { 0 };
+            
+                lock (owner.SyncRoot)
+                {
+                    owner.enumsOpen++;
+                    haveDecremented = false;
+                }
             }
         }
     }

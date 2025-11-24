@@ -10,7 +10,7 @@ using mlStringValidation.Path;
 
 namespace mlEncodedDB
 {
-    public sealed partial class BlockList : IDisposable, IReadOnlyList<IEncodable>
+    public sealed partial class BlockList : IDisposable, IReadOnlyList<IEncodable>, ICollection<IEncodable>
     {
         internal static int BlockTableLength = 64;
 
@@ -18,6 +18,7 @@ namespace mlEncodedDB
         public int Count => counter.GetCount();
         public int EnumsOpen => enumsOpen;
         public object SyncRoot = new object();
+        bool ICollection<IEncodable>.IsReadOnly => false;
 
         private readonly FileInterface file;
         private readonly SyncedList<BlockTableEntry> btes;
@@ -83,11 +84,11 @@ namespace mlEncodedDB
 
         public void Add(IEncodable obj)
         {
-            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
-            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
-
             lock (SyncRoot)
             {
+                if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+            
                 var ms = new MemoryStream();
     
                 DDEncoder.DDEncoder.EncodeObject(ms, obj);
@@ -137,39 +138,108 @@ namespace mlEncodedDB
 
         private int FindBTEIndex(int objIndex)
         {
-            if (objIndex < 0) { throw new IndexOutOfRangeException(); }
-            else if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
-            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
-
-            var skip = new List<int>() { 0 };
-
-            int n = -1;
-
-            for (int x = 0; x < btes.Count; x++)
+            lock (SyncRoot)
             {
-                if (skip.Contains(x))
+                if (objIndex < 0) { throw new IndexOutOfRangeException(); }
+                else if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+    
+                var skip = new List<int>() { 0 };
+    
+                int n = -1;
+    
+                for (int x = 0; x < btes.Count; x++)
                 {
-                    if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
-
-                    continue;
-                }
-                else if (!btes[x].Empty)
-                {
-                    n++;
-
-                    if (n == objIndex)
+                    if (skip.Contains(x))
                     {
-                        return x;
+                        if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+    
+                        continue;
+                    }
+                    else if (!btes[x].Empty)
+                    {
+                        n++;
+    
+                        if (n == objIndex)
+                        {
+                            return x;
+                        }
+                    }
+    
+                    if (btes[x].NextBlock > 0)
+                    {
+                        skip.Add(btes[x].NextBlock);
+                    }
+                }
+    
+                throw new IndexOutOfRangeException();
+            }
+        }
+
+        public bool Remove(IEncodable obj)
+        {
+            lock (SyncRoot)
+            {
+                if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
+                int n = 0;
+                bool found = false;
+
+                foreach (IEncodable ie in this)
+                {
+                    if (ie.Equals(obj))
+                    {
+                        found = true;
+                        break;
+                    }
+
+                    n++;
+                }
+
+                if (!found) { return false; }
+
+                Remove(n);
+
+                return true;
+            }
+        }
+
+        public bool Contains(IEncodable item)
+        {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+
+            lock (SyncRoot)
+            {
+                bool found = false;
+
+                foreach (IEncodable ie in this)
+                {
+                    if (ie.Equals(item))
+                    {
+                        found = true;
+                        break;
                     }
                 }
 
-                if (btes[x].NextBlock > 0)
+                return found;
+            }
+        }
+
+        public void CopyTo(IEncodable[] array, int arrayIndex)
+        {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+            
+            lock (SyncRoot)
+            {
+                if (array.Length < arrayIndex + Count) { throw new InvalidOperationException("Not enough elements in array."); }
+
+                foreach (IEncodable ie in this)
                 {
-                    skip.Add(btes[x].NextBlock);
+                    array[arrayIndex] = ie;
+                    arrayIndex++;
                 }
             }
-
-            throw new IndexOutOfRangeException();
         }
 
         public IEncodable Get(int objIndex)
@@ -222,11 +292,11 @@ namespace mlEncodedDB
         }
         public void Clear()
         {
-            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
-            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
-
             lock (SyncRoot)
             {
+                if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
                 var skip = new List<int>() { 0 };
     
                 for (int x = 0; x < btes.Count; x++)
@@ -250,11 +320,11 @@ namespace mlEncodedDB
 
         public void Remove(int objIndex)
         {
-            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
-            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
-
             lock (SyncRoot)
             {
+                if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
                 var bteIndex = FindBTEIndex(objIndex);
     
                 var chain = GetChain(bteIndex);
@@ -272,11 +342,11 @@ namespace mlEncodedDB
 
         public void Set(int objIndex, IEncodable obj)
         {
-            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
-            else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
-
             lock (SyncRoot)
             {
+                if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+                else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
+
                 var bteIndex = FindBTEIndex(objIndex);
     
                 using var ms = new MemoryStream();
