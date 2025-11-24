@@ -10,18 +10,19 @@ using mlStringValidation.Path;
 
 namespace mlEncodedDB
 {
-    public sealed partial class BlockList : IDisposable, IEnumerable<IEncodable>
+    public sealed partial class BlockList : IDisposable, IReadOnlyList<IEncodable>
     {
         internal static int BlockTableLength = 64;
 
         public IEncodable this[int index] => Get(index);
         public int Count => counter.GetCount();
+        public int EnumsOpen => enumsOpen;
+        public object SyncRoot = new object();
 
         private readonly FileInterface file;
         private readonly SyncedList<BlockTableEntry> btes;
         private readonly BlockListCounter counter;
         private readonly BlockListCache cache;
-        private readonly SemaphoreSlim semaphore;
         private volatile int enumsOpen = 0;
 
         static BlockList()
@@ -31,54 +32,53 @@ namespace mlEncodedDB
 
         public BlockList(PathBase path, FileMode fileMode)
         {
-            semaphore = new SemaphoreSlim(1);
-
-            file = new FileInterface(path, fileMode);
-
-            var handle = file.GetHandle();
-
-            if (file.Length == 0)
+            lock (SyncRoot)
             {
-                var a = new BlockTableEntry(sizeof(int) + 1, BlockTableEntry.EncodedSize * BlockTableLength, -1, false);
-
-                var ev = new EncodedValue(1);
-
-                handle.Encode(1);
-                handle.Encode(a);
-
-                btes = new SyncedList<BlockTableEntry> { a };
-            }
-            else
-            {
-                var task = handle.Decode();
-
-                try { task.Wait(); }
-                catch (EncodingException) { throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list."); }
-
-                if (!(task.DecodedObject.Value is int n))
+                file = new FileInterface(path, fileMode);
+    
+                var handle = file.GetHandle();
+    
+                if (file.Length == 0)
                 {
-                    throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list.");
+                    var a = new BlockTableEntry(sizeof(int) + 1, BlockTableEntry.EncodedSize * BlockTableLength, -1, false);
+    
+                    var ev = new EncodedValue(1);
+    
+                    handle.Encode(1);
+                    handle.Encode(a);
+    
+                    btes = new SyncedList<BlockTableEntry> { a };
                 }
-
-                btes = new SyncedList<BlockTableEntry>(n);
-
-                task = handle.Decode();
-
-                try { task.Wait(); }
-                catch (EncodingException) { throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list."); }
-
-                if (!(task.DecodedObject.Value is BlockTableEntry bte))
+                else
                 {
-                    throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list.");
+                    var task = handle.Decode();
+    
+                    try { task.Wait(); }
+                    catch (EncodingException) { throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list."); }
+    
+                    if (!(task.DecodedObject.Value is int n))
+                    {
+                        throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list.");
+                    }
+    
+                    btes = new SyncedList<BlockTableEntry>(n);
+    
+                    task = handle.Decode();
+    
+                    try { task.Wait(); }
+                    catch (EncodingException) { throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list."); }
+    
+                    if (!(task.DecodedObject.Value is BlockTableEntry bte))
+                    {
+                        throw new ArgumentException($"File ({path.Path}) does not appear to be valid block list.");
+                    }
+    
+                    ReadBlockTables(n, bte);
                 }
-
-                ReadBlockTables(n, bte);
+    
+                counter = new BlockListCounter(this);
+                cache = new BlockListCache(1024);
             }
-
-            counter = new BlockListCounter(this);
-            cache = new BlockListCache(1024);
-
-            semaphore.Release();
         }
 
         public void Add(IEncodable obj)
@@ -86,41 +86,54 @@ namespace mlEncodedDB
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
             else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
-            semaphore.Wait();
-
-            var ms = new MemoryStream();
-
-            DDEncoder.DDEncoder.EncodeObject(ms, obj);
-
-            var len = (int)ms.Length;
-
-            var b = ms.GetBuffer();
-
-            var handle = file.GetHandle();
-            int n;
-            int written = 0;
-
-            while (written < len)
+            lock (SyncRoot)
             {
-                var bte = GetEmptyBlock(len - written);
-                btes[bte].Empty = false;
-                WriteBTE(bte);
-
-                n = Math.Min(btes[bte].Length, len);
-
-                handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
-                handle.Write(b, written, n);
-
-                handle.WaitAll();
-
-                written += n;
+                var ms = new MemoryStream();
+    
+                DDEncoder.DDEncoder.EncodeObject(ms, obj);
+    
+                var len = (int)ms.Length;
+    
+                var b = ms.GetBuffer();
+    
+                var handle = file.GetHandle();
+                int n;
+                int written = 0;
+    
+                while (written < len)
+                {
+                    var bte = GetEmptyBlock(len - written);
+                    btes[bte].Empty = false;
+                    WriteBTE(bte);
+    
+                    n = Math.Min(btes[bte].Length, len);
+    
+                    handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
+                    handle.Write(b, written, n);
+    
+                    handle.WaitAll();
+    
+                    written += n;
+                }
+    
+                cache.TrySet(Count, obj);
+                counter.Incrament(1);
             }
-
-            cache.TrySet(Count, obj);
-            counter.Incrament(1);
-
-            semaphore.Release();
         }
+
+        /// <summary>
+        /// I reccomend you take out a lock on SyncRoot before calling this as it will prevent any other enums from opening while you access the list.
+        /// </summary>
+        /// <returns>True if the number of enums open drops to zero within the timespan.</returns>
+        public bool WaitForEnums(TimeSpan timeout)
+        {
+            return SpinWait.SpinUntil(() => enumsOpen == 0, timeout);
+        }
+
+        /// <summary>
+        /// I reccomend you take out a lock on SyncRoot before calling this as it will prevent any other enums from opening while you access the list.
+        /// </summary>
+        public void WaitForEnums() => WaitForEnums(TimeSpan.MaxValue);
 
         private int FindBTEIndex(int objIndex)
         {
@@ -163,23 +176,21 @@ namespace mlEncodedDB
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
 
-            semaphore.Wait();
-
-            if (cache.TryGet(objIndex, out IEncodable? x))
+            lock (SyncRoot)
             {
-                semaphore.Release();
-
-                return x;
-            }
-            else
-            {
-                var ret = ReadObject(FindBTEIndex(objIndex));
-
-                cache.TrySet(objIndex, ret);
-
-                semaphore.Release();
-
-                return ret;
+                if (cache.TryGet(objIndex, out IEncodable? x))
+                {
+    
+                    return x;
+                }
+                else
+                {
+                    var ret = ReadObject(FindBTEIndex(objIndex));
+    
+                    cache.TrySet(objIndex, ret);
+    
+                    return ret;
+                }
             }
         }
 
@@ -187,56 +198,54 @@ namespace mlEncodedDB
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
 
-            semaphore.Wait();
-
-            var skip = new List<int>() { 0 };
-            var ret = new List<IEncodable>();
-
-            for (int x = 0; x < btes.Count; x++)
+            lock (SyncRoot)
             {
-                if (skip.Contains(x))
+                var skip = new List<int>() { 0 };
+                var ret = new List<IEncodable>();
+    
+                for (int x = 0; x < btes.Count; x++)
                 {
-                    if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+                    if (skip.Contains(x))
+                    {
+                        if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+                    }
+                    else if (!btes[x].Empty)
+                    {
+                        if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+    
+                        ret.Add(ReadObject(x));
+                    }
                 }
-                else if (!btes[x].Empty)
-                {
-                    if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
 
-                    ret.Add(ReadObject(x));
-                }
+                return ret;
             }
-
-            semaphore.Release();
-
-            return ret;
         }
         public void Clear()
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
             else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
-            semaphore.Wait();
-
-            var skip = new List<int>() { 0 };
-
-            for (int x = 0; x < btes.Count; x++)
+            lock (SyncRoot)
             {
-                if (skip.Contains(x))
+                var skip = new List<int>() { 0 };
+    
+                for (int x = 0; x < btes.Count; x++)
                 {
-                    if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+                    if (skip.Contains(x))
+                    {
+                        if (btes[x].NextBlock > 0) { skip.Add(btes[x].NextBlock); }
+                    }
+                    else if (!btes[x].Empty)
+                    {
+                        btes[x].Empty = true;
+    
+                        WriteBTE(x);
+                    }
                 }
-                else if (!btes[x].Empty)
-                {
-                    btes[x].Empty = true;
-
-                    WriteBTE(x);
-                }
+    
+                counter.Clear();
+                cache.Clear();
             }
-
-            counter.Clear();
-            cache.Clear();
-
-            semaphore.Release();
         }
 
         public void Remove(int objIndex)
@@ -244,22 +253,21 @@ namespace mlEncodedDB
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
             else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
-            semaphore.Wait();
-
-            var bteIndex = FindBTEIndex(objIndex);
-
-            var chain = GetChain(bteIndex);
-
-            foreach (var x in chain)
+            lock (SyncRoot)
             {
-                btes[x].NextBlock = -1;
-                btes[x].Empty = true;
-                WriteBTE(x);
+                var bteIndex = FindBTEIndex(objIndex);
+    
+                var chain = GetChain(bteIndex);
+    
+                foreach (var x in chain)
+                {
+                    btes[x].NextBlock = -1;
+                    btes[x].Empty = true;
+                    WriteBTE(x);
+                }
+    
+                counter.Decrament(1);
             }
-
-            counter.Decrament(1);
-
-            semaphore.Release();
         }
 
         public void Set(int objIndex, IEncodable obj)
@@ -267,39 +275,38 @@ namespace mlEncodedDB
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
             else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
 
-            semaphore.Wait();
-
-            var bteIndex = FindBTEIndex(objIndex);
-
-            using var ms = new MemoryStream();
-
-            DDEncoder.DDEncoder.EncodeObject(ms, obj);
-
-            var b = ms.GetBuffer();
-
-            var handle = file.GetHandle();
-
-            ResizeChain(bteIndex, b.Length);
-
-            int written = 0;
-            int n;
-
-            while (written < b.Length)
+            lock (SyncRoot)
             {
-                n = Math.Min(btes[bteIndex].Length, b.Length - written);
-
-                handle.Seek(btes[bteIndex].StartPos, SeekOrigin.Begin);
-
-                handle.Write(b, written, n);
-
-                written += n;
-
-                bteIndex = btes[bteIndex].NextBlock;
+                var bteIndex = FindBTEIndex(objIndex);
+    
+                using var ms = new MemoryStream();
+    
+                DDEncoder.DDEncoder.EncodeObject(ms, obj);
+    
+                var b = ms.GetBuffer();
+    
+                var handle = file.GetHandle();
+    
+                ResizeChain(bteIndex, b.Length);
+    
+                int written = 0;
+                int n;
+    
+                while (written < b.Length)
+                {
+                    n = Math.Min(btes[bteIndex].Length, b.Length - written);
+    
+                    handle.Seek(btes[bteIndex].StartPos, SeekOrigin.Begin);
+    
+                    handle.Write(b, written, n);
+    
+                    written += n;
+    
+                    bteIndex = btes[bteIndex].NextBlock;
+                }
+    
+                cache.TrySet(objIndex, obj);
             }
-
-            cache.TrySet(objIndex, obj);
-
-            semaphore.Release();
         }
 
         private List<int> GetChain(int bteIndex)
