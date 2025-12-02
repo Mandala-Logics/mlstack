@@ -4,7 +4,7 @@ using DDEncoder;
 
 namespace mlEncodedDB
 {
-    public sealed class BlockListCache
+    internal sealed class BlockListCache
     {
         public int Capacity {get;}
 
@@ -16,26 +16,26 @@ namespace mlEncodedDB
             cache = new Dictionary<int, IEncodable>(capacity);
         }
 
-        public bool TrySet(int index, IEncodable val)
+        public bool TrySet(int bteIndex, IEncodable val)
         {
-            if (cache.ContainsKey(index))
+            if (cache.ContainsKey(bteIndex))
             {
-                cache[index] = val;
+                cache[bteIndex] = val;
                 return true;
             }
             else if (cache.Count >= Capacity) { return false; }
             else
             {
-                cache.Add(index, val);
+                cache.Add(bteIndex, val);
                 return true;
             }
         }
 
-        public bool TryGet(int index, out IEncodable? val)
+        public bool TryGet(int bteIndex, out IEncodable? val)
         {
-            if (cache.ContainsKey(index))
+            if (cache.ContainsKey(bteIndex))
             {
-                val = cache[index];
+                val = cache[bteIndex];
                 return true;
             }
             else
@@ -48,6 +48,11 @@ namespace mlEncodedDB
         public void Clear()
         {
             cache.Clear();
+        }
+
+        public void Remove(int bteIndex)
+        {
+            cache.Remove(bteIndex);
         }
     }
 }

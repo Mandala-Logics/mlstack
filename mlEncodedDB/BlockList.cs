@@ -21,9 +21,9 @@ namespace mlEncodedDB
         bool ICollection<IEncodable>.IsReadOnly => false;
 
         private readonly FileInterface file;
-        private readonly SyncedList<BlockTableEntry> btes;
-        private readonly BlockListCounter counter;
-        private readonly BlockListCache cache;
+        internal readonly SyncedList<BlockTableEntry> btes;
+        internal readonly BlockListCounter counter;
+        internal readonly BlockListCache cache;
         private volatile int enumsOpen = 0;
 
         static BlockList()
@@ -89,37 +89,47 @@ namespace mlEncodedDB
                 if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
                 else if (enumsOpen > 0) { throw new InvalidOperationException("BlockList cannot be modified while it is being enumerated."); }
             
-                var ms = new MemoryStream();
-    
-                DDEncoder.DDEncoder.EncodeObject(ms, obj);
-    
-                var len = (int)ms.Length;
-    
-                var b = ms.GetBuffer();
-    
-                var handle = file.GetHandle();
-                int n;
-                int written = 0;
-    
-                while (written < len)
-                {
-                    var bte = GetEmptyBlock(len - written);
-                    btes[bte].Empty = false;
-                    WriteBTE(bte);
-    
-                    n = Math.Min(btes[bte].Length, len);
-    
-                    handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
-                    handle.Write(b, written, n);
-    
-                    handle.WaitAll();
-    
-                    written += n;
-                }
-    
-                cache.TrySet(Count, obj);
-                counter.Incrament(1);
+                DoAdd(obj);
             }
+        }
+
+        internal int DoAdd(IEncodable obj)
+        {
+            var ms = new MemoryStream();
+    
+            DDEncoder.DDEncoder.EncodeObject(ms, obj);
+
+            var len = (int)ms.Length;
+
+            var b = ms.GetBuffer();
+
+            var handle = file.GetHandle();
+            int n;
+            int written = 0;
+            int first = -1;
+
+            while (written < len)
+            {
+                var bte = GetEmptyBlock(len - written);
+                btes[bte].Empty = false;
+                WriteBTE(bte);
+
+                n = Math.Min(btes[bte].Length, len);
+
+                handle.Seek(btes[bte].StartPos, SeekOrigin.Begin);
+                handle.Write(b, written, n);
+
+                handle.WaitAll();
+
+                written += n;
+
+                if (first < 0) { first = bte; }
+            }
+
+            cache.TrySet(first, obj);
+            counter.Incrament(1);
+
+            return first;
         }
 
         /// <summary>
@@ -136,7 +146,7 @@ namespace mlEncodedDB
         /// </summary>
         public void WaitForEnums() => WaitForEnums(TimeSpan.MaxValue);
 
-        private int FindBTEIndex(int objIndex)
+        internal int FindBTEIndex(int objIndex)
         {
             lock (SyncRoot)
             {
@@ -246,18 +256,19 @@ namespace mlEncodedDB
         {
             if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
 
+            var bteIndex = FindBTEIndex(objIndex);
+
             lock (SyncRoot)
             {
-                if (cache.TryGet(objIndex, out IEncodable? x))
+                if (cache.TryGet(bteIndex, out IEncodable? x))
                 {
-    
                     return x;
                 }
                 else
                 {
-                    var ret = ReadObject(FindBTEIndex(objIndex));
+                    var ret = ReadObject(bteIndex);
     
-                    cache.TrySet(objIndex, ret);
+                    cache.TrySet(bteIndex, ret);
     
                     return ret;
                 }
@@ -337,6 +348,33 @@ namespace mlEncodedDB
                 }
     
                 counter.Decrament(1);
+                cache.Remove(bteIndex);
+            }
+        }
+
+        public int IndexOf(IEncodable obj)
+        {
+            if (file.Disposed) { throw new ObjectDisposedException("BlockList"); }
+
+            lock (SyncRoot)
+            {
+                int n = 0;
+                bool found = false;
+
+                foreach (IEncodable ie in this)
+                {
+                    if (ie.Equals(obj))
+                    {
+                        found = true;
+                        break;
+                    }
+
+                    n++;
+                }
+
+                if (!found) { return n; }
+
+                return -1;
             }
         }
 
@@ -375,7 +413,7 @@ namespace mlEncodedDB
                     bteIndex = btes[bteIndex].NextBlock;
                 }
     
-                cache.TrySet(objIndex, obj);
+                cache.TrySet(bteIndex, obj);
             }
         }
 
@@ -434,7 +472,7 @@ namespace mlEncodedDB
 
         }
         
-        private IEncodable ReadObject(int bteIndex)
+        internal IEncodable ReadObject(int bteIndex)
         {
             var curr = btes[bteIndex];
 

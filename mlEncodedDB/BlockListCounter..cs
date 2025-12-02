@@ -31,6 +31,11 @@ namespace mlEncodedDB
                 }
             }
 
+            public void SetCount(int count)
+            {
+                this.count = count;
+            }
+
             public int GetCount()
             {
                 if (count is int y) { return y; }
