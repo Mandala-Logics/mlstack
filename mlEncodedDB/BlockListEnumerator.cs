@@ -62,7 +62,7 @@ namespace mlEncodedDB
                     {
                         if (owner.btes[pos].NextBlock > 0) { skip.Add(owner.btes[pos].NextBlock); }
 
-                        if (owner.cache.TryGet(n, out IEncodable? x))
+                        if (owner.cache.TryGet(pos, out IEncodable? x))
                         {
                             Current = x;
                         }
@@ -70,7 +70,7 @@ namespace mlEncodedDB
                         {
                             Current = owner.ReadObject(pos);
 
-                            owner.cache.TrySet(n, Current);
+                            owner.cache.TrySet(pos, Current);
                         }
 
                         n++;
